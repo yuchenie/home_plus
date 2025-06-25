@@ -16,6 +16,11 @@ float base_radius = 0.5 * (0.264+0.072*2) * sqrt(2); // square base with sides 2
 float wheel_circumference = PI * 0.096; // wheels are 96mm diameter
 float resolution = 2786.2;
 
+#define MAX_COMMANDS 20
+String commandQueue[MAX_COMMANDS];
+int commandCount = 0;
+int currentCommandIndex = 0;
+
 // === Servo Setup ===
 Servo hand, wrist, elbow, shoulder;
 int hand_pos, wrist_pos, elbow_pos, shoulder_pos;
@@ -72,20 +77,23 @@ void setup() {
 }
 
 void loop() {
-    static String lastCommand = " ";
+    static String lastCommand = "0 0 0";
 
     if (Serial.available() > 0) {
-        lastCommand = "";
+        // lastCommand = "";
+        String fullInput = "";
         while (Serial.available() > 0) {
             char c = Serial.read();
-            if (c == '\n') break;
-            lastCommand += c;
+            // if (c == '\n') break;
+            // lastCommand += c;
+            fullInput += c;
             delay(1);
         }
+        parseCommandQueue(fullInput);
     }
 
     read();
-    parseMessage(lastCommand);
+    // parseMessage(lastCommand);
 
     dx = target_x - x;
     dy = target_y - y;
@@ -106,11 +114,15 @@ void loop() {
         target_y = 0;
         target_theta = 0;
 
-        lastCommand = " ";
+        // lastCommand = "0 0 0";
+        if (currentCommandIndex < commandCount) {
+            parseMessage(commandQueue[currentCommandIndex]);
+            currentCommandIndex++;
+        }
     }
 
     drive(vx, vy, omega); 
-    Serial.println(String(target_x) + " " + String(target_y) + " " + String(target_theta));
+    // Serial.println(String(target_x) + " " + String(target_y) + " " + String(target_theta));
 
     /*
     if (lastCommand.length() == 1) {
@@ -137,11 +149,12 @@ void read() {
     int32_t se = SE_ENCODER.read();
 
     theta = (+ nw + ne + sw + se) / 4.0;
-    x = (- nw - ne + sw + se) / 4.0;
-    y = (+ nw - ne + sw - se) / 4.0;
+    x = (+ nw - ne + sw - se) / 4.0;
+    y = (+ nw + ne - sw - se) / 4.0;
 }
 
 void parseMessage(String input) {
+    Serial.println(input);
     int firstSpace = input.indexOf(' ');
     int secondSpace = input.indexOf(' ', firstSpace + 1);
 
@@ -160,15 +173,40 @@ void parseMessage(String input) {
     target_theta = (((PI / 180) * base_radius * theta_) / wheel_circumference) * resolution;
 }
 
+void parseCommandQueue(String input) {
+    commandCount = 0;
+    currentCommandIndex = 0;
+    int startIdx = 0;
+
+    while (startIdx < input.length() && commandCount < MAX_COMMANDS) {
+        int endIdx = input.indexOf('n', startIdx);
+        if (endIdx == -1) endIdx = input.length();
+
+        String command = input.substring(startIdx, endIdx);
+        command.trim();
+
+        if (command.length() > 0) {
+            commandQueue[commandCount++] = command;
+        }
+
+        startIdx = endIdx + 1;
+    }
+
+    if (commandCount > 0) {
+        parseMessage(commandQueue[currentCommandIndex]);
+        currentCommandIndex++;
+    }
+}
+
 int32_t sgn(int32_t val) {
     return val / abs(val);
 }
 
 void drive(float x, float y, float theta) {
-    float nw = (x - y - theta);
-    float ne = (x + y - theta);
-    float sw = (x + y + theta);
-    float se = (x - y + theta);
+    float nw = (-y - x - theta);
+    float ne = (-y + x - theta);
+    float sw = (-y + x + theta);
+    float se = (-y - x + theta);
 
     float max = max(abs(nw), max(abs(ne), max(abs(sw), abs(se))));
     if (max > 1.0) {
