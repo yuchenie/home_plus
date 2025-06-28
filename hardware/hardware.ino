@@ -3,11 +3,14 @@
 #include <Encoder.h>
 #include <Math.h>
 
+unsigned long current_millis = 0;
+unsigned long prev_millis = 0;
+
 float vx, vy, omega;
 int32_t target_x, target_y, target_theta;
 int32_t x, y, theta;
-float dx, dy, dtheta;
-float threshold = 100;
+int32_t dx, dy, dtheta;
+int drive_threshold = 100;
 
 float kP = 0.002;
 
@@ -16,16 +19,20 @@ float base_radius = 0.5 * (0.264+0.072*2) * sqrt(2); // square base with sides 2
 float wheel_circumference = PI * 0.096; // wheels are 96mm diameter
 float resolution = 2786.2;
 
-#define MAX_COMMANDS 20
+String serialBuffer = "";
+const int MAX_COMMANDS = 20;
 String commandQueue[MAX_COMMANDS];
 int commandCount = 0;
 int currentCommandIndex = 0;
 
 // === Servo Setup ===
 Servo hand, wrist, elbow, shoulder;
-int hand_pos, wrist_pos, elbow_pos, shoulder_pos;
+float hand_target, wrist_target, elbow_target, shoulder_target;
+float hand_pos, wrist_pos, elbow_pos, shoulder_pos;
+float dhand, dwrist, delbow, dshoulder;
+float servo_threshold = 10.0;
 
-// === Motor Pins ===
+// === Drive Setup ===
 #define NW_PWM 6 
 #define NW_CW 49
 #define NW_CCW 48
@@ -46,13 +53,20 @@ Encoder SW_ENCODER(2, 15);
 #define SE_CCW 47
 Encoder SE_ENCODER(3, 14);
 
+// === Linear Actuator Setup ===
+float la_target, frame_target;
+float la_pos, frame_pos;
+float dla, dframe;
+float vla, vframe;
+float la_threshold = 1.0;
+
 #define LA_DOWN 44
 #define LA_UP 45
-#define LA_PWM 41
+#define LA_PWM 41 // 12mm/s, max 450mm
 
 #define FRAME_UP 42
 #define FRAME_DOWN 43
-#define FRAME_PWM 40
+#define FRAME_PWM 40 // 12mm/s
 
 void setup() {
     Serial.begin(9600);
@@ -62,59 +76,65 @@ void setup() {
     elbow.attach(11);
     shoulder.attach(10);
 
+    hand_target = 1000;
+    wrist_target = 900;
+    elbow_target = 1500;
+    shoulder_target = 2100;
+
     hand_pos = 1000;
     wrist_pos = 900;
-    elbow_pos = 1600;
+    elbow_pos = 1500;
     shoulder_pos = 2100;
 
-    hand.write(hand_pos);
-    wrist.write(wrist_pos);
-    elbow.write(elbow_pos);
-    shoulder.write(shoulder_pos);
+    hand.write(hand_target);
+    wrist.write(wrist_target);
+    elbow.write(elbow_target);
+    shoulder.write(shoulder_target);
+
+    la_target = 450;
+    la_pos = 450; // assuming it starts at top
+    // la_pos = 0; // assuming worst case
+
+    frame_target = 0;
+    frame_pos = 0; // assuming it starts at bottom
+    // frame_pos = 100; // assuming worst case
 
     Serial.println("USB Serial Ready");
-    // printServoAngles();
 }
 
 void loop() {
-    static String lastCommand = "0 0 0";
+    prev_millis = current_millis;
+    current_millis = millis();
 
-    if (Serial.available() > 0) {
-        // lastCommand = "";
-        String fullInput = "";
-        while (Serial.available() > 0) {
-            char c = Serial.read();
-            // if (c == '\n') break;
-            // lastCommand += c;
-            fullInput += c;
-            delay(1);
+    while (Serial.available()) {
+        char c = Serial.read();
+
+        if (c == '\n') {
+            // End of message received
+            parseCommandQueue(serialBuffer);
+            serialBuffer = "";  // clear for next message
+        } else {
+            serialBuffer += c;
         }
-        parseCommandQueue(fullInput);
     }
 
-    read();
-    // parseMessage(lastCommand);
-
-    dx = target_x - x;
-    dy = target_y - y;
-    dtheta = target_theta - theta;
+    update_pos();
     
-    if (abs(dx) > threshold) { vx = kP*dx; } else { vx = 0; }
-    if (abs(dy) > threshold) { vy = kP*dy; } else { vy = 0; }
-    if (abs(dtheta) > threshold) { omega = kP*dtheta; } else { omega = 0; }
+    if (abs(dx) > drive_threshold) { vx = kP*dx; } else { vx = 0; }
+    if (abs(dy) > drive_threshold) { vy = kP*dy; } else { vy = 0; }
+    if (abs(dtheta) > drive_threshold) { omega = kP*dtheta; } else { omega = 0; }
 
     // reset when goal is reached
-    if (vx == 0  && vy == 0 && omega == 0) {
-        NW_ENCODER.write(0);
-        NE_ENCODER.write(0);
-        SW_ENCODER.write(0);
-        SE_ENCODER.write(0);
+    if (status()) {
+        // NW_ENCODER.write(0);
+        // NE_ENCODER.write(0);
+        // SW_ENCODER.write(0);
+        // SE_ENCODER.write(0);
 
-        target_x = 0;
-        target_y = 0;
-        target_theta = 0;
-
-        // lastCommand = "0 0 0";
+        // target_x = 0;
+        // target_y = 0;
+        // target_theta = 0;
+        
         if (currentCommandIndex < commandCount) {
             parseMessage(commandQueue[currentCommandIndex]);
             currentCommandIndex++;
@@ -122,26 +142,34 @@ void loop() {
     }
 
     drive(vx, vy, omega); 
-    // Serial.println(String(target_x) + " " + String(target_y) + " " + String(target_theta));
+    hand.write(hand_target);
+    wrist.write(wrist_target);
+    elbow.write(elbow_target);
+    shoulder.write(shoulder_target);
+    controlLA(vla);
+    controlFrame(vframe);
 
-    /*
-    if (lastCommand.length() == 1) {
-        char cmd = lastCommand.charAt(0);
-        switch (cmd) {
-            case ' ': drive(0, 0, 0); break;
-        }
-    } else {
-        parseMessage(lastCommand);
-        drive(vx, vy, omega);
-        // int time = 2000 * (abs(x)+abs(y)+abs(theta));
-        // delay(time);
-        // drive(0, 0, 0);
-    }
-    // lastCommand = " ";
-    */
+    // Serial.println(String(la_pos) + " " + String(frame_pos));
 }
 
-void read() {
+bool status() {
+    Serial.println(abs(dla));
+
+    return ((abs(dx) < drive_threshold) && 
+            (abs(dy) < drive_threshold) && 
+            (abs(dtheta) < drive_threshold) && 
+            (abs(dhand) < servo_threshold) && 
+            (abs(dwrist) < servo_threshold) && 
+            (abs(delbow) < servo_threshold) && 
+            (abs(dshoulder) < servo_threshold) &&
+            (abs(dla) < la_threshold) && 
+            (abs(dframe) < la_threshold));
+}
+
+void update_pos() {
+    float dt = current_millis - prev_millis;
+
+    // === Drive ===
     // positive counterclockwise
     int32_t nw = NW_ENCODER.read();
     int32_t ne = NE_ENCODER.read();
@@ -151,35 +179,95 @@ void read() {
     theta = (+ nw + ne + sw + se) / 4.0;
     x = (+ nw - ne + sw - se) / 4.0;
     y = (+ nw + ne - sw - se) / 4.0;
+
+    dx = target_x - x;
+    dy = target_y - y;
+    dtheta = target_theta - theta;
+
+    // === Servos ===
+    // 40 RPM no stall, maps to 0.2 microseconds per millisecond
+    dhand = hand_target - hand_pos;
+    dwrist = wrist_target - wrist_pos;
+    delbow = elbow_target - elbow_pos;
+    dshoulder = shoulder_target - shoulder_pos;
+
+    if (abs(dhand) > servo_threshold) { hand_pos += (sgn(dhand) * dt * 0.2); }
+    if (abs(dwrist) > servo_threshold) { wrist_pos += (sgn(dwrist) * dt * 0.2); }
+    if (abs(delbow) > servo_threshold) { elbow_pos += (sgn(delbow) * dt * 0.2); }
+    if (abs(dshoulder) > servo_threshold) { shoulder_pos += (sgn(dshoulder) * dt * 0.7*0.2); } // seems like worst case is ~0.7x speed
+
+    // === Linear Actuators ===
+    dla = la_target - la_pos;
+    dframe = frame_target - frame_pos;
+
+    vla = (abs(dla) > la_threshold) ? sgn(dla) : 0;
+    vframe = (abs(dframe) > la_threshold) ? sgn(dframe) : 0;
+
+    if (abs(dla) > la_threshold) { la_pos += (sgn(dla) * dt * 0.012); }
+    if (abs(dframe) > la_threshold) { frame_pos += (sgn(dframe) * dt * 0.012); }
+}
+
+int splitString(String input, char delimiter, String* tokens, int maxTokens) {
+    int tokenCount = 0;
+    int start = 0;
+    int end = input.indexOf(delimiter);
+
+    while (end != -1 && tokenCount < maxTokens) {
+        tokens[tokenCount++] = input.substring(start, end);
+        start = end + 1;
+        end = input.indexOf(delimiter, start);
+    }
+
+    // Add the last token
+    if (tokenCount < maxTokens) {
+        tokens[tokenCount++] = input.substring(start);
+    }
+
+    return tokenCount;
 }
 
 void parseMessage(String input) {
     Serial.println(input);
-    int firstSpace = input.indexOf(' ');
-    int secondSpace = input.indexOf(' ', firstSpace + 1);
 
-    // velocity control
-    // vx = input.substring(0, firstSpace).toFloat();
-    // vy = input.substring(firstSpace + 1, secondSpace).toFloat();
-    // omega = input.substring(secondSpace + 1).toFloat();
+    const int maxTokens = 9;
+    String tokens[maxTokens];
+    int tokenCount = splitString(input, ' ', tokens, maxTokens);
 
-    float x_ = input.substring(0, firstSpace).toFloat();
-    float y_ = input.substring(firstSpace + 1, secondSpace).toFloat();
-    float theta_ = input.substring(secondSpace + 1).toFloat();
+    if (tokenCount != 9) {
+        Serial.println("Error: Incorrect number of inputs.");
+        return;
+    }
+
+    float x_ = 0.01 * tokens[0].toFloat();
+    float y_ = 0.01 * tokens[1].toFloat();
+    float theta_ = tokens[2].toFloat();
+    float hand_ = tokens[3].toFloat();
+    float wrist_ = tokens[4].toFloat();
+    float elbow_ = tokens[5].toFloat();
+    float shoulder_ = tokens[6].toFloat();
+    float la_ = tokens[7].toFloat();
+    float frame_ = tokens[8].toFloat();
 
     // convert meters / degrees to encoder pulses
     target_x = (x_ / wheel_circumference) * resolution;
     target_y = (y_ / wheel_circumference) * resolution;
     target_theta = (((PI / 180) * base_radius * theta_) / wheel_circumference) * resolution;
+    hand_target = map(hand_, 0, 100, 900, 1000);
+    wrist_target = map(wrist_, 0, 100, 900, 2100);
+    elbow_target = map(elbow_, 0, 100, 2100, 900);
+    shoulder_target = map(shoulder_, 0, 100, 2100, 900);
+    la_target = constrain(la_, 0, 450);
+    frame_target = constrain(frame_, 0, 175);
 }
 
 void parseCommandQueue(String input) {
+    Serial.println(input);
     commandCount = 0;
     currentCommandIndex = 0;
     int startIdx = 0;
 
     while (startIdx < input.length() && commandCount < MAX_COMMANDS) {
-        int endIdx = input.indexOf('n', startIdx);
+        int endIdx = input.indexOf(',', startIdx);
         if (endIdx == -1) endIdx = input.length();
 
         String command = input.substring(startIdx, endIdx);
@@ -198,8 +286,8 @@ void parseCommandQueue(String input) {
     }
 }
 
-int32_t sgn(int32_t val) {
-    return val / abs(val);
+float sgn(int32_t x) {
+    return (x > 0) - (x < 0);  // 1 for positive, -1 for negative, and 0 for 0
 }
 
 void drive(float x, float y, float theta) {
@@ -223,47 +311,26 @@ void drive(float x, float y, float theta) {
 }
 
 void setMotorPower(int pwm, int cw, int ccw, float percent) {
-    if (percent < 0) {
-        digitalWrite(cw, LOW);
-        digitalWrite(ccw, HIGH);
-    } else if (percent > 0) {
-        digitalWrite(cw, HIGH);
-        digitalWrite(ccw, LOW);
-    } else {
-        digitalWrite(cw, LOW);
-        digitalWrite(ccw, LOW);
-    }
+    bool dir = (percent > 0);
+    digitalWrite(cw, dir);
+    digitalWrite(ccw, !dir);
     analogWrite(pwm, (int)(200 * constrain(abs(percent), 0, 1)));
 }
 
 void controlLA(int direction) {
-    if (direction > 0) {
-        digitalWrite(LA_UP, HIGH);
-        digitalWrite(LA_DOWN, LOW);
-        digitalWrite(LA_PWM, HIGH);
-    } else if (direction < 0) {
-        digitalWrite(LA_UP, LOW);
-        digitalWrite(LA_DOWN, HIGH);
-        digitalWrite(LA_PWM, HIGH);
-    } else {
-        digitalWrite(LA_UP, LOW);
-        digitalWrite(LA_DOWN, LOW);
-        digitalWrite(LA_PWM, LOW);
-    }
+    bool dir = (direction > 0);
+    digitalWrite(LA_UP, dir);
+    digitalWrite(LA_DOWN, !dir);
+
+    bool en = (direction != 0);
+    digitalWrite(LA_PWM, en);
 }
 
 void controlFrame(int direction) {
-    if (direction > 0) {
-        digitalWrite(FRAME_UP, HIGH);
-        digitalWrite(FRAME_DOWN, LOW);
-        digitalWrite(FRAME_PWM, HIGH);
-    } else if (direction < 0) {
-        digitalWrite(FRAME_UP, LOW);
-        digitalWrite(FRAME_DOWN, HIGH);
-        digitalWrite(FRAME_PWM, HIGH);
-    } else {
-        digitalWrite(FRAME_UP, LOW);
-        digitalWrite(FRAME_DOWN, LOW);
-        digitalWrite(FRAME_PWM, LOW);
-    }
+    bool dir = (direction > 0);
+    digitalWrite(FRAME_UP, dir);
+    digitalWrite(FRAME_DOWN, !dir);
+
+    bool en = (direction != 0);
+    digitalWrite(FRAME_PWM, en);
 }
