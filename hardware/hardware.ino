@@ -10,9 +10,9 @@ float vx, vy, omega;
 int32_t target_x, target_y, target_theta;
 int32_t x, y, theta;
 int32_t dx, dy, dtheta;
-int drive_threshold = 100;
+int drive_threshold = 200;
 
-float kP = 0.002;
+float kP = 0.0015;
 
 float wheel_radius = 0.096; // 96 mm
 float base_radius = 0.5 * (0.264+0.072*2) * sqrt(2); // square base with sides 264mm
@@ -153,8 +153,6 @@ void loop() {
 }
 
 bool status() {
-    Serial.println(abs(dla));
-
     return ((abs(dx) < drive_threshold) && 
             (abs(dy) < drive_threshold) && 
             (abs(dtheta) < drive_threshold) && 
@@ -177,8 +175,8 @@ void update_pos() {
     int32_t se = SE_ENCODER.read();
 
     theta = (+ nw + ne + sw + se) / 4.0;
-    x = (+ nw - ne + sw - se) / 4.0;
-    y = (+ nw + ne - sw - se) / 4.0;
+    x = ((+ nw - ne + sw - se) * sqrt(2)) / 4.0;
+    y = ((+ nw + ne - sw - se) * sqrt(2)) / 4.0;
 
     dx = target_x - x;
     dy = target_y - y;
