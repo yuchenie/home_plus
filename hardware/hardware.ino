@@ -250,8 +250,8 @@ void parseMessage(String input) {
     target_x = (x_ / wheel_circumference) * resolution;
     target_y = (y_ / wheel_circumference) * resolution;
     target_theta = (((PI / 180) * base_radius * theta_) / wheel_circumference) * resolution;
-    hand_target = map(hand_, 0, 100, 900, 1000);
-    wrist_target = map(wrist_, 0, 100, 900, 2100);
+    hand_target = map(hand_, 0, 100, 920, 1110);
+    wrist_target = map(wrist_, 0, 100, 900, 2400);
     elbow_target = map(elbow_, 0, 100, 2100, 900);
     shoulder_target = map(shoulder_, 0, 100, 2100, 900);
     la_target = constrain(la_, 0, 450);
