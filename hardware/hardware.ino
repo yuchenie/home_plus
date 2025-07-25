@@ -175,8 +175,8 @@ void update_pos() {
     int32_t se = SE_ENCODER.read();
 
     theta = (+ nw + ne + sw + se) / 4.0;
-    x = ((+ nw - ne + sw - se) * sqrt(2)) / 4.0;
-    y = ((+ nw + ne - sw - se) * sqrt(2)) / 4.0;
+    x = ((+ nw - ne + sw - se) / 4.0) * sqrt(2);
+    y = ((+ nw + ne - sw - se) / 4.0) * sqrt(2);
 
     dx = target_x - x;
     dy = target_y - y;
