@@ -26,10 +26,10 @@ int commandCount = 0;
 int currentCommandIndex = 0;
 
 // === Servo Setup ===
-Servo hand, wrist, elbow, shoulder;
-float hand_target, wrist_target, elbow_target, shoulder_target;
-float hand_pos, wrist_pos, elbow_pos, shoulder_pos;
-float dhand, dwrist, delbow, dshoulder;
+Servo grip, hand, wrist, elbow, shoulder;
+float grip_target, hand_target, wrist_target, elbow_target, shoulder_target;
+float grip_pos, hand_pos, wrist_pos, elbow_pos, shoulder_pos;
+float dgrip, dhand, dwrist, delbow, dshoulder;
 float servo_threshold = 10.0;
 
 // === Drive Setup ===
@@ -71,21 +71,25 @@ float la_threshold = 1.0;
 void setup() {
     Serial.begin(9600);
 
+    grip.attach(9);
     hand.attach(13);  
     wrist.attach(12);
     elbow.attach(11);
     shoulder.attach(10);
 
+    grip_target = 2100;
     hand_target = 1000;
     wrist_target = 900;
     elbow_target = 1500;
     shoulder_target = 2100;
 
+    grip_pos = 2100;
     hand_pos = 1000;
     wrist_pos = 900;
     elbow_pos = 1500;
     shoulder_pos = 2100;
 
+    grip.write(grip_target);
     hand.write(hand_target);
     wrist.write(wrist_target);
     elbow.write(elbow_target);
@@ -142,6 +146,7 @@ void loop() {
     }
 
     drive(vx, vy, omega); 
+    grip.write(grip_target);
     hand.write(hand_target);
     wrist.write(wrist_target);
     elbow.write(elbow_target);
@@ -156,6 +161,7 @@ bool status() {
     return ((abs(dx) < drive_threshold) && 
             (abs(dy) < drive_threshold) && 
             (abs(dtheta) < drive_threshold) && 
+            (abs(dgrip) < servo_threshold) && 
             (abs(dhand) < servo_threshold) && 
             (abs(dwrist) < servo_threshold) && 
             (abs(delbow) < servo_threshold) && 
@@ -184,11 +190,13 @@ void update_pos() {
 
     // === Servos ===
     // 40 RPM no stall, maps to 0.2 microseconds per millisecond
+    dgrip = grip_target - grip_pos;
     dhand = hand_target - hand_pos;
     dwrist = wrist_target - wrist_pos;
     delbow = elbow_target - elbow_pos;
     dshoulder = shoulder_target - shoulder_pos;
 
+    if (abs(dgrip) > servo_threshold) { grip_pos += (sgn(dgrip) * dt * 0.2); }
     if (abs(dhand) > servo_threshold) { hand_pos += (sgn(dhand) * dt * 0.2); }
     if (abs(dwrist) > servo_threshold) { wrist_pos += (sgn(dwrist) * dt * 0.2); }
     if (abs(delbow) > servo_threshold) { elbow_pos += (sgn(delbow) * dt * 0.2); }
@@ -227,11 +235,11 @@ int splitString(String input, char delimiter, String* tokens, int maxTokens) {
 void parseMessage(String input) {
     Serial.println(input);
 
-    const int maxTokens = 9;
+    const int maxTokens = 10;
     String tokens[maxTokens];
     int tokenCount = splitString(input, ' ', tokens, maxTokens);
 
-    if (tokenCount != 9) {
+    if (tokenCount != 10) {
         Serial.println("Error: Incorrect number of inputs.");
         return;
     }
@@ -239,17 +247,19 @@ void parseMessage(String input) {
     float x_ = 0.01 * tokens[0].toFloat();
     float y_ = 0.01 * tokens[1].toFloat();
     float theta_ = tokens[2].toFloat();
-    float hand_ = tokens[3].toFloat();
-    float wrist_ = tokens[4].toFloat();
-    float elbow_ = tokens[5].toFloat();
-    float shoulder_ = tokens[6].toFloat();
-    float la_ = tokens[7].toFloat();
-    float frame_ = tokens[8].toFloat();
+    float grip_ = tokens[3].toFloat();
+    float hand_ = tokens[4].toFloat();
+    float wrist_ = tokens[5].toFloat();
+    float elbow_ = tokens[6].toFloat();
+    float shoulder_ = tokens[7].toFloat();
+    float la_ = tokens[8].toFloat();
+    float frame_ = tokens[9].toFloat();
 
     // convert meters / degrees to encoder pulses
     target_x = (x_ / wheel_circumference) * resolution;
     target_y = (y_ / wheel_circumference) * resolution;
     target_theta = (((PI / 180) * base_radius * theta_) / wheel_circumference) * resolution;
+    grip_target = map(grip_, 0, 100, 2100, 1000);
     hand_target = map(hand_, 0, 100, 920, 1110);
     wrist_target = map(wrist_, 0, 100, 900, 2400);
     elbow_target = map(elbow_, 0, 100, 2100, 900);
