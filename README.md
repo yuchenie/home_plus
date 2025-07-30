@@ -1,8 +1,6 @@
 # home+ Hardware Controls
 ## Serial Inputs
-In order to control the positions of the base and arm joints, the user should send a message through the serial port connected to the Arduino via USB cable. The interface is designed to receive serial messages either through the Serial Monitor in the Arduino IDE, or through an external script configured to send messages through the appropriate serial port on the user's device. The serial message should adhere to the following format:\n
-    "%f %f %f %f %f %f %f %f %f %f"\n
-The serial message should be a series of ten floats, with each float separated by a single space. Sequentially, each float represents the absolute position* of the following:
+In order to control the positions of the base and arm joints, the user should send a message through the serial port connected to the Arduino via USB cable. The interface is designed to receive serial messages either through the Serial Monitor in the Arduino IDE, or through an external script configured to send messages through the appropriate serial port on the user's device. The serial message should adhere to the following format: "%f %f %f %f %f %f %f %f %f %f". The serial message should be a series of ten floats, with each float separated by a single space. Sequentially, each float represents the absolute position* of the following:
 1. The position (cm) of the base in the x-axis. The positive x-axis, from the perspective of the base center, is in the direction of the arm.
 2. The position (cm) of the base in the y-axis. The positive y-axis, from the perspective of the base center, is in the direction to the right of the arm.
 3. The orientation (degrees) of the base. A positive translation in the orientation axis, viewing from the top, is clockwise.
