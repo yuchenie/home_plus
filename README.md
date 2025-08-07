@@ -4,7 +4,7 @@ In order to control the positions of the base and arm joints, the user should se
 1. The position (cm) of the base in the x-axis. The positive x-axis, from the perspective of the base center, is in the direction of the arm.
 2. The position (cm) of the base in the y-axis. The positive y-axis, from the perspective of the base center, is in the direction to the left of the arm.
 3. The orientation (degrees) of the base. A positive translation in the orientation axis, viewing from the top, is clockwise.
-4. The configuration of the gripper. This is a value between 0 and 100, with 0 mapping to fully closed and 100 mapping to fully opened.
+4. The configuration of the gripper. This is a value between 0 and 90, with 0 mapping to fully closed and 90 mapping to fully opened, the range of motion being about 90 degrees.
 5. The configuration of the "hand" servo, rotating the end effector around the axis through the center of the "wrist" joint. This is a value between -90 and 75 (degrees). 0 represents the hand pointing directly away from arm 2.
 6. The configuration of the "wrist" servo, rotating the end effector around the axis through the length of the "forearm" segment. This is a value between -80 and 340 (degrees). 0 reprsents the "palm" (the bottom flat side of the gripper) having the ability to be parallel to the ground given a certain hand position (might not sound intuative but if the wrist is rotated slightly that parallel potential no longer exists)
 7. The configuration of the "elbow" servo, rotating the end effector around the "elbow" joint. This is a value between -73 and 168 (degrees). 0 represents a 0 degree angle with the first arm.
