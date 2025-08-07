@@ -260,15 +260,16 @@ void parseMessage(String input) {
     target_y = (y_ / wheel_circumference) * resolution;
     target_theta = (((PI / 180) * base_radius * theta_) / wheel_circumference) * resolution;
     grip_target = map(grip_, 0, 100, 2100, 1000);
-    hand_target = map(hand_, 0, 100, 920, 1110);
-    wrist_target = map(wrist_, 0, 100, 900, 2400);
-    elbow_target = map(elbow_, 0, 100, 2100, 900);
-    shoulder_target = map(shoulder_, 0, 100, 2100, 900);
+    hand_target = map(hand_, -90, 75, 925, 1110);
+    wrist_target = map(wrist_, -80, 340, 545, 2400);
+    elbow_target = map(elbow_, -73, 168, 2400, 550);
+    shoulder_target = map(shoulder_, 0, 185, 2400, 550);
     la_target = constrain(la_, 0, 450);
     frame_target = constrain(frame_, 0, 175);
 }
 
 void parseCommandQueue(String input) {
+    Serial.flush();
     Serial.println(input);
     commandCount = 0;
     currentCommandIndex = 0;
