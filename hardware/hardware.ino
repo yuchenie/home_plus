@@ -125,7 +125,7 @@ void loop() {
     update_pos();
     
     if (abs(dx) > drive_threshold) { vx = kP*dx; } else { vx = 0; }
-    if (abs(dy) > drive_threshold) { vy = kP*dy; } else { vy = 0; }
+    if (abs(dy) > drive_threshold) { vy = -kP*dy; } else { vy = 0; }
     if (abs(dtheta) > drive_threshold) { omega = kP*dtheta; } else { omega = 0; }
 
     // reset when goal is reached
