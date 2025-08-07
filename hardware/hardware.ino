@@ -20,7 +20,7 @@ float wheel_circumference = PI * 0.096; // wheels are 96mm diameter
 float resolution = 2786.2;
 
 String serialBuffer = "";
-const int MAX_COMMANDS = 20;
+const int MAX_COMMANDS = 100;
 String commandQueue[MAX_COMMANDS];
 int commandCount = 0;
 int currentCommandIndex = 0;
