@@ -95,13 +95,13 @@ void setup() {
     elbow.write(elbow_target);
     shoulder.write(shoulder_target);
 
-    la_target = 450;
+    la_target = 0;
     la_pos = 450; // assuming it starts at top
-    // la_pos = 0; // assuming worst case
+    la_pos = 0; // assuming worst case
 
     frame_target = 0;
     frame_pos = 0; // assuming it starts at bottom
-    // frame_pos = 100; // assuming worst case
+    //frame_pos = 175; // assuming worst case
 
     Serial.println("USB Serial Ready");
 }
@@ -125,7 +125,7 @@ void loop() {
     update_pos();
     
     if (abs(dx) > drive_threshold) { vx = kP*dx; } else { vx = 0; }
-    if (abs(dy) > drive_threshold) { vy = -kP*dy; } else { vy = 0; }
+    if (abs(dy) > drive_threshold) { vy = kP*dy; } else { vy = 0; }
     if (abs(dtheta) > drive_threshold) { omega = kP*dtheta; } else { omega = 0; }
 
     // reset when goal is reached
@@ -182,7 +182,7 @@ void update_pos() {
 
     theta = (+ nw + ne + sw + se) / 4.0;
     x = ((+ nw - ne + sw - se) / 4.0) * sqrt(2);
-    y = ((+ nw + ne - sw - se) / 4.0) * sqrt(2);
+    y = ((- nw - ne + sw + se) / 4.0) * sqrt(2);
 
     dx = target_x - x;
     dy = target_y - y;
@@ -259,12 +259,12 @@ void parseMessage(String input) {
     target_x = (x_ / wheel_circumference) * resolution;
     target_y = (y_ / wheel_circumference) * resolution;
     target_theta = (((PI / 180) * base_radius * theta_) / wheel_circumference) * resolution;
-    grip_target = map(grip_, 0, 100, 2100, 1000);
+    grip_target = map(grip_, 0, 90, 1900, 750);
     hand_target = map(hand_, -90, 75, 925, 1110);
     wrist_target = map(wrist_, -80, 340, 545, 2400);
     elbow_target = map(elbow_, -73, 168, 2400, 550);
-    shoulder_target = map(shoulder_, 0, 185, 2400, 550);
-    la_target = constrain(la_, 0, 450);
+    shoulder_target = map(shoulder_, -45, 140, 2400, 550);
+    la_target = constrain(la_, 0, 450000);
     frame_target = constrain(frame_, 0, 175);
 }
 
@@ -300,10 +300,10 @@ float sgn(int32_t x) {
 }
 
 void drive(float x, float y, float theta) {
-    float nw = (-y - x - theta);
-    float ne = (-y + x - theta);
-    float sw = (-y + x + theta);
-    float se = (-y - x + theta);
+    float nw = (y - x - theta);
+    float ne = (y + x - theta);
+    float sw = (y + x + theta);
+    float se = (y - x + theta);
 
     float max = max(abs(nw), max(abs(ne), max(abs(sw), abs(se))));
     if (max > 1.0) {
