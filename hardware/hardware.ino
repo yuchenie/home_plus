@@ -62,7 +62,7 @@ float la_threshold = 1.0;
 
 #define LA_DOWN 44
 #define LA_UP 45
-#define LA_PWM 41 // 12mm/s, max 450mm
+#define LA_PWM 41 // 12mm/s, max 435
 
 #define FRAME_UP 42
 #define FRAME_DOWN 43
@@ -95,13 +95,13 @@ void setup() {
     elbow.write(elbow_target);
     shoulder.write(shoulder_target);
 
-    la_target = 0;
-    la_pos = 450; // assuming it starts at top
-    la_pos = 0; // assuming worst case
+    la_target = 435;
+    la_pos = 435; // assuming it starts at top
+    //la_pos = 0; // assuming worst case
 
     frame_target = 0;
     frame_pos = 0; // assuming it starts at bottom
-    //frame_pos = 175; // assuming worst case
+    //frame_pos = 150; // assuming worst case
 
     Serial.println("USB Serial Ready");
 }
@@ -180,7 +180,7 @@ void update_pos() {
     int32_t sw = SW_ENCODER.read();
     int32_t se = SE_ENCODER.read();
 
-    theta = (+ nw + ne + sw + se) / 4.0;
+    theta = -((+ nw + ne + sw + se) / 4.0);
     x = ((+ nw - ne + sw - se) / 4.0) * sqrt(2);
     y = ((- nw - ne + sw + se) / 4.0) * sqrt(2);
 
@@ -209,7 +209,7 @@ void update_pos() {
     vla = (abs(dla) > la_threshold) ? sgn(dla) : 0;
     vframe = (abs(dframe) > la_threshold) ? sgn(dframe) : 0;
 
-    if (abs(dla) > la_threshold) { la_pos += (sgn(dla) * dt * 0.012); }
+    if (abs(dla) > la_threshold) { la_pos += (sgn(dla) * dt * 0.00871); }
     if (abs(dframe) > la_threshold) { frame_pos += (sgn(dframe) * dt * 0.012); }
 }
 
@@ -264,8 +264,8 @@ void parseMessage(String input) {
     wrist_target = map(wrist_, -80, 340, 545, 2400);
     elbow_target = map(elbow_, -73, 168, 2400, 550);
     shoulder_target = map(shoulder_, -45, 140, 2400, 550);
-    la_target = constrain(la_, 0, 450000);
-    frame_target = constrain(frame_, 0, 175);
+    la_target = constrain(la_, 0, 435);
+    frame_target = constrain(frame_, 0, 150);
 }
 
 void parseCommandQueue(String input) {
@@ -300,10 +300,10 @@ float sgn(int32_t x) {
 }
 
 void drive(float x, float y, float theta) {
-    float nw = (y - x - theta);
-    float ne = (y + x - theta);
-    float sw = (y + x + theta);
-    float se = (y - x + theta);
+    float nw = (y - x + theta);
+    float ne = (y + x + theta);
+    float sw = (y + x - theta);
+    float se = (y - x - theta);
 
     float max = max(abs(nw), max(abs(ne), max(abs(sw), abs(se))));
     if (max > 1.0) {
