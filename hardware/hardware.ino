@@ -101,7 +101,7 @@ void setup() {
 
     frame_target = 0;
     frame_pos = 0; // assuming it starts at bottom
-    //frame_pos = 150; // assuming worst case
+    frame_pos = 150; // assuming worst case
 
     Serial.println("USB Serial Ready");
 }
@@ -210,7 +210,7 @@ void update_pos() {
     vframe = (abs(dframe) > la_threshold) ? sgn(dframe) : 0;
 
     if (abs(dla) > la_threshold) { la_pos += (sgn(dla) * dt * 0.00871); }
-    if (abs(dframe) > la_threshold) { frame_pos += (sgn(dframe) * dt * 0.012); }
+    if (abs(dframe) > la_threshold) { frame_pos += (sgn(dframe) * dt * 0.0091455); }
 }
 
 int splitString(String input, char delimiter, String* tokens, int maxTokens) {
@@ -269,7 +269,7 @@ void parseMessage(String input) {
 }
 
 void parseCommandQueue(String input) {
-    Serial.flush();
+    //Serial.flush();
     Serial.println(input);
     commandCount = 0;
     currentCommandIndex = 0;
