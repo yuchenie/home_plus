@@ -2,17 +2,24 @@
 #include <Servo.h>
 #include <Encoder.h>
 #include <Math.h>
+#include <PID_v1.h>
 
 unsigned long current_millis = 0;
 unsigned long prev_millis = 0;
 
-float vx, vy, omega;
-int32_t target_x, target_y, target_theta;
-int32_t x, y, theta;
-int32_t dx, dy, dtheta;
+double vx, vy, omega;
+double vx_, vy_, omega_;
+double target_x, target_y, target_theta;
+double x, y, theta;
+double dx, dy, dtheta;
 int drive_threshold = 200;
 
 float kP = 0.0015;
+float kI = 0.0;
+float kD = 0.0;
+PID xPID(&x, &vx, &target_x, kP, kI, kD, DIRECT);
+PID yPID(&y, &vy, &target_y, kP, kI, kD, DIRECT);
+PID thetaPID(&theta, &omega, &target_theta, kP, kI, kD, DIRECT);
 
 float wheel_radius = 0.096; // 96 mm
 float base_radius = 0.5 * (0.264+0.072*2) * sqrt(2); // square base with sides 264mm
@@ -124,9 +131,9 @@ void loop() {
 
     update_pos();
     
-    if (abs(dx) > drive_threshold) { vx = kP*dx; } else { vx = 0; }
-    if (abs(dy) > drive_threshold) { vy = kP*dy; } else { vy = 0; }
-    if (abs(dtheta) > drive_threshold) { omega = kP*dtheta; } else { omega = 0; }
+    if (abs(dx) > drive_threshold) { vx_ = vx; } else { vx_ = 0; }
+    if (abs(dy) > drive_threshold) { vy_ = vy; } else { vy_ = 0; }
+    if (abs(dtheta) > drive_threshold) { omega_ = omega; } else { omega_ = 0; }
 
     // reset when goal is reached
     if (status()) {
@@ -145,7 +152,7 @@ void loop() {
         }
     }
 
-    drive(vx, vy, omega); 
+    drive(vx_, vy_, omega_); 
     grip.write(grip_target);
     hand.write(hand_target);
     wrist.write(wrist_target);
